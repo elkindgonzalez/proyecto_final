@@ -6,10 +6,7 @@ export default class UsersDAO {
     const query = userModel.find(filter);
     if (select) query.select(select);
     if (sort) query.sort(sort);
-    return query
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
+    return query.skip((page - 1) * limit).limit(limit).lean();
   };
 
   getBy = (filter = {}, { select = null } = {}) => {
@@ -18,12 +15,22 @@ export default class UsersDAO {
     return query.lean();
   };
 
-  save = (doc) => {
-    return userModel.create(doc); // respetará unique email
+  // Necesario para services/controller
+  getById = (id, { select = null } = {}) => {
+    const query = userModel.findById(id);
+    if (select) query.select(select);
+    return query.lean();
   };
 
-  update = (id, doc) => {
-    return userModel.findByIdAndUpdate(id, { $set: doc }, { new: true }).lean();
+  save = (doc) => {
+    return userModel.create(doc); // respeta unique email
+  };
+
+  // Update flexible: acepta operadores ($addToSet, $set, ...)
+  update = (id, doc, options = {}) => {
+    const hasOp = doc && Object.keys(doc).some(k => k.startsWith('$'));
+    const updateDoc = hasOp ? doc : { $set: doc };
+    return userModel.findByIdAndUpdate(id, updateDoc, { new: true, ...options }).lean();
   };
 
   delete = (id) => {

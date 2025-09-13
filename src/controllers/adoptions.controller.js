@@ -1,59 +1,79 @@
-import { adoptionsService, petsService, usersService } from "../services/index.js";
+import mongoose from 'mongoose';
+import { adoptionsService, petsService, usersService } from '../services/index.js';
+import { toHttpError } from '../utils/errorMap.js';
 
-const getAllAdoptions = async (req, res) => {
+const getAllAdoptions = async (_req, res) => {
   try {
     const result = await adoptionsService.getAll();
-    res.send({ status: "success", payload: result });
+    return res.send({ status: 'success', payload: result });
   } catch (err) {
-    res.status(500).send({ status: "error", error: err.message });
+    const { statusCode, message } = toHttpError(err, 500);
+    return res.status(statusCode).send({ status: 'error', error: message });
   }
 };
 
 const getAdoption = async (req, res) => {
   try {
-    const adoptionId = req.params.aid;
-    const adoption = await adoptionsService.getById(adoptionId);
-    if (!adoption) {
-      return res.status(404).send({ status: "error", error: "Adoption not found" });
+    const { aid } = req.params;
+    if (!mongoose.isValidObjectId(aid)) {
+      return res.status(400).send({ status: 'error', error: 'aid inválido' });
     }
-    res.send({ status: "success", payload: adoption });
+    const adoption = await adoptionsService.getById(aid);
+    if (!adoption) {
+      return res.status(404).send({ status: 'error', error: 'Adoption not found' });
+    }
+    return res.send({ status: 'success', payload: adoption });
   } catch (err) {
-    res.status(500).send({ status: "error", error: err.message });
+    const { statusCode, message } = toHttpError(err, 500);
+    return res.status(statusCode).send({ status: 'error', error: message });
   }
 };
 
 const createAdoption = async (req, res) => {
   try {
-    const { uid, pid } = req.body; // 👈 ahora usa body
+    const { uid, pid } = req.body; // usar body
+
+    // Validaciones básicas
     if (!uid || !pid) {
-      return res.status(400).send({ status: "error", error: "uid and pid are required" });
+      return res.status(400).send({ status: 'error', error: 'uid and pid are required' });
+    }
+    if (!mongoose.isValidObjectId(uid) || !mongoose.isValidObjectId(pid)) {
+      return res.status(400).send({ status: 'error', error: 'ids inválidos' });
     }
 
-    const user = await usersService.getUserById(uid);
+    // Existencia de usuario y mascota
+    // Nota: usa getById (coherente con services habituales)
+    const user = await usersService.getById(uid);
     if (!user) {
-      return res.status(404).send({ status: "error", error: "User not found" });
+      return res.status(404).send({ status: 'error', error: 'User not found' });
     }
 
     const pet = await petsService.getById(pid);
     if (!pet) {
-      return res.status(404).send({ status: "error", error: "Pet not found" });
+      return res.status(404).send({ status: 'error', error: 'Pet not found' });
     }
 
     if (pet.adopted) {
-      return res.status(400).send({ status: "error", error: "Pet is already adopted" });
+      return res.status(400).send({ status: 'error', error: 'Pet is already adopted' });
     }
 
-    // actualizar user y pet
-    user.pets.push(pet._id);
-    await usersService.update(user._id, { pets: user.pets });
-    await petsService.update(pet._id, { adopted: true, owner: user._id });
+    // Crear adopción primero para tener _id garantizado
+    const adoption = await adoptionsService.create({ owner: uid, pet: pid });
+    const adoptionId = adoption?._id?.toString?.();
+    if (!adoptionId) {
+      // Si tu DAO ya siempre retorna _id no deberías llegar aquí
+      return res.status(500).send({ status: 'error', error: 'No se pudo crear la adopción' });
+    }
 
-    // crear adopción
-    const adoption = await adoptionsService.create({ owner: user._id, pet: pet._id });
+    // Actualizaciones atómicas y seguras (sin depender de user.pets local)
+    await usersService.update(uid, { $addToSet: { pets: new mongoose.Types.ObjectId(pid) } });
+    await petsService.update(pid, { adopted: true, owner: new mongoose.Types.ObjectId(uid) });
 
-    res.status(201).send({ status: "success", payload: adoption._id }); // 👈 devolvemos id
+    // Respuesta 201 con id como esperan los tests
+    return res.status(201).send({ status: 'success', payload: adoptionId });
   } catch (err) {
-    res.status(500).send({ status: "error", error: err.message });
+    const { statusCode, message } = toHttpError(err, 500);
+    return res.status(statusCode).send({ status: 'error', error: message });
   }
 };
 

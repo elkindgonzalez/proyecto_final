@@ -34,6 +34,9 @@ app.use('/api/mocks', mocksRouter);
 
 setupSwagger(app); // 👈 habilita Swagger en /docs
 
-app.listen(PORT, () => console.log(`🚀 Servidor escuchando en el puerto ${PORT}`));
+// 🚀 Importante: no levantar el servidor en modo test
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => console.log(`🚀 Servidor escuchando en el puerto ${PORT}`));
+}
 
 export default app; // 👈 útil para supertest
