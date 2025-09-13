@@ -7,7 +7,9 @@ import UserRepository from "../repository/UserRepository.js";
 import PetRepository from "../repository/PetRepository.js";
 import AdoptionRepository from "../repository/AdoptionRepository.js";
 
-// Fallback directo al modelo para extraer _id si el repo no lo devuelve claramente
+// Fallbacks directos a modelos Mongoose
+import UserModel from "../dao/models/User.js";
+import PetModel from "../dao/models/Pet.js";
 import AdoptionModel from "../dao/models/Adoption.js";
 
 // Instancias de tus repositorios
@@ -23,32 +25,37 @@ export const usersService = {
     if (typeof usersRepo.create === "function") return usersRepo.create(doc);
     if (typeof usersRepo.save === "function") return usersRepo.save(doc);
     if (typeof usersRepo.insert === "function") return usersRepo.insert(doc);
-    throw new Error("UsersRepository no expone create/save/insert");
+    // Fallback directo
+    return UserModel.create(doc);
   },
 
   async getAll(filter = {}) {
     if (typeof usersRepo.getAll === "function") return usersRepo.getAll(filter);
     if (typeof usersRepo.findAll === "function") return usersRepo.findAll(filter);
     if (typeof usersRepo.list === "function") return usersRepo.list(filter);
-    throw new Error("UsersRepository no expone getAll/findAll/list");
+    // Fallback directo
+    return UserModel.find(filter).lean();
   },
 
   async getById(id) {
     if (typeof usersRepo.getById === "function") return usersRepo.getById(id);
     if (typeof usersRepo.getUserById === "function") return usersRepo.getUserById(id);
     if (typeof usersRepo.findById === "function") return usersRepo.findById(id);
-    throw new Error("UsersRepository no expone getById/getUserById/findById");
+    // Fallback directo
+    return UserModel.findById(id).lean();
   },
 
   async update(id, update) {
-    // Soportar nombres alternos típicos en repositorios
     if (typeof usersRepo.updateById === "function") return usersRepo.updateById(id, update);
     if (typeof usersRepo.update === "function") return usersRepo.update(id, update);
     if (typeof usersRepo.modify === "function") return usersRepo.modify(id, update);
     if (typeof usersRepo.updateUser === "function") return usersRepo.updateUser(id, update);
     if (typeof usersRepo.updateOne === "function") return usersRepo.updateOne(id, update);
     if (typeof usersRepo.patch === "function") return usersRepo.patch(id, update);
-    throw new Error("UsersRepository no expone update/updateById/modify/updateUser/updateOne/patch");
+    // Fallback directo (respetando operadores si vienen)
+    const hasOp = update && Object.keys(update).some(k => k.startsWith("$"));
+    const doc = hasOp ? update : { $set: update };
+    return UserModel.findByIdAndUpdate(id, doc, { new: true }).lean();
   },
 };
 
@@ -60,32 +67,37 @@ export const petsService = {
     if (typeof petsRepo.create === "function") return petsRepo.create(doc);
     if (typeof petsRepo.save === "function") return petsRepo.save(doc);
     if (typeof petsRepo.insert === "function") return petsRepo.insert(doc);
-    throw new Error("PetRepository no expone create/save/insert");
+    // Fallback directo
+    return PetModel.create(doc);
   },
 
   async getAll(filter = {}) {
     if (typeof petsRepo.getAll === "function") return petsRepo.getAll(filter);
     if (typeof petsRepo.findAll === "function") return petsRepo.findAll(filter);
     if (typeof petsRepo.list === "function") return petsRepo.list(filter);
-    throw new Error("PetRepository no expone getAll/findAll/list");
+    // Fallback directo
+    return PetModel.find(filter).lean();
   },
 
   async getById(id) {
     if (typeof petsRepo.getById === "function") return petsRepo.getById(id);
     if (typeof petsRepo.getPetById === "function") return petsRepo.getPetById(id);
     if (typeof petsRepo.findById === "function") return petsRepo.findById(id);
-    throw new Error("PetRepository no expone getById/getPetById/findById");
+    // Fallback directo
+    return PetModel.findById(id).lean();
   },
 
   async update(id, update) {
-    // Soportar nombres alternos típicos en repositorios
     if (typeof petsRepo.updateById === "function") return petsRepo.updateById(id, update);
     if (typeof petsRepo.update === "function") return petsRepo.update(id, update);
     if (typeof petsRepo.modify === "function") return petsRepo.modify(id, update);
     if (typeof petsRepo.updatePet === "function") return petsRepo.updatePet(id, update);
     if (typeof petsRepo.updateOne === "function") return petsRepo.updateOne(id, update);
     if (typeof petsRepo.patch === "function") return petsRepo.patch(id, update);
-    throw new Error("PetRepository no expone update/updateById/modify/updatePet/updateOne/patch");
+    // Fallback directo
+    const hasOp = update && Object.keys(update).some(k => k.startsWith("$"));
+    const doc = hasOp ? update : { $set: update };
+    return PetModel.findByIdAndUpdate(id, doc, { new: true }).lean();
   },
 };
 
@@ -108,7 +120,8 @@ export const adoptionsService = {
     } else if (typeof adoptionsRepo.saveAdoption === "function") {
       created = await adoptionsRepo.saveAdoption(doc);
     } else {
-      throw new Error("AdoptionRepository no expone create/save/insert/createAdoption/saveAdoption");
+      // Fallback directo al modelo
+      created = await AdoptionModel.create(doc);
     }
 
     // 2) Normalizar el _id desde distintas formas
@@ -119,7 +132,7 @@ export const adoptionsService = {
       created?.payload?.id ||
       (typeof created === "string" ? created : undefined);
 
-    // 3) Fallback: si no tenemos id, buscamos por owner+pet en el modelo (última salvaguarda)
+    // 3) Fallback: si no tenemos id, buscamos por owner+pet (última salvaguarda)
     if (!id && doc?.owner && doc?.pet) {
       const found = await AdoptionModel.findOne({ owner: doc.owner, pet: doc.pet })
         .sort({ _id: -1 })
@@ -138,13 +151,15 @@ export const adoptionsService = {
     if (typeof adoptionsRepo.getAll === "function") return adoptionsRepo.getAll(filter);
     if (typeof adoptionsRepo.findAll === "function") return adoptionsRepo.findAll(filter);
     if (typeof adoptionsRepo.list === "function") return adoptionsRepo.list(filter);
-    throw new Error("AdoptionRepository no expone getAll/findAll/list");
+    // Fallback directo
+    return AdoptionModel.find(filter).lean();
   },
 
   async getById(id) {
     if (typeof adoptionsRepo.getById === "function") return adoptionsRepo.getById(id);
     if (typeof adoptionsRepo.findById === "function") return adoptionsRepo.findById(id);
     if (typeof adoptionsRepo.get === "function") return adoptionsRepo.get(id);
-    throw new Error("AdoptionRepository no expone getById/findById/get");
+    // Fallback directo
+    return AdoptionModel.findById(id).lean();
   },
 };
