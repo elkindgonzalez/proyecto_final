@@ -1,10 +1,16 @@
-import { Router } from 'express';
-import adoptionsController from '../controllers/adoptions.controller.js';
+// src/routes/adoption.router.js
+import { Router } from "express";
+import adoptionsController from "../controllers/adoptions.controller.js";
 
 const router = Router();
 
-router.get('/', adoptionsController.getAllAdoptions);
-router.get('/:aid', adoptionsController.getAdoption);
-router.post('/', adoptionsController.createAdoption); // 👈 ahora usa body
+// Crear adopción
+router.post("/", adoptionsController.createAdoption);
+
+// Listar adopciones
+router.get("/", adoptionsController.getAllAdoptions);
+
+// Obtener una adopción por ID
+router.get("/:aid", adoptionsController.getAdoption);
 
 export default router;

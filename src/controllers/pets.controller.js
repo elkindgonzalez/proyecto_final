@@ -1,8 +1,9 @@
+// src/controllers/pets.controller.js
 import PetDTO from "../dto/Pet.dto.js";
 import { petsService } from "../services/index.js";
 import __dirname from "../utils/index.js";
 
-const getAllPets = async (req, res) => {
+const getAllPets = async (_req, res) => {
   try {
     const pets = await petsService.getAll();
     res.send({ status: "success", payload: pets });
@@ -26,50 +27,63 @@ const getPet = async (req, res) => {
 
 const createPet = async (req, res) => {
   try {
-    const { name, type, age } = req.body;   // 👈 unificados
-    if (!name || !type) {
+    const { name, specie, birthDate } = req.body; // 👈 campos alineados
+    if (!name || !specie) {
       return res
         .status(400)
         .send({ status: "error", error: "Incomplete values" });
     }
-    const pet = PetDTO.getPetInputFrom({ name, type, age });
+
+    const pet = PetDTO.getPetInputFrom({ name, specie, birthDate });
     const result = await petsService.create(pet);
-    res.status(201).send({ status: "success", payload: result._id }); // 👈 solo id
+
+    res.status(201).send({ status: "success", payload: result._id }); // 👈 devolvemos solo el id
   } catch (err) {
     res.status(500).send({ status: "error", error: err.message });
   }
 };
 
 const updatePet = async (req, res) => {
-  const petUpdateBody = req.body;
-  const petId = req.params.pid;
-  await petsService.update(petId, petUpdateBody);
-  res.send({ status: "success", message: "pet updated" });
+  try {
+    const petUpdateBody = req.body;
+    const petId = req.params.pid;
+    await petsService.update(petId, petUpdateBody);
+    res.send({ status: "success", message: "pet updated" });
+  } catch (err) {
+    res.status(500).send({ status: "error", error: err.message });
+  }
 };
 
 const deletePet = async (req, res) => {
-  const petId = req.params.pid;
-  await petsService.delete(petId);
-  res.send({ status: "success", message: "pet deleted" });
+  try {
+    const petId = req.params.pid;
+    await petsService.delete(petId);
+    res.send({ status: "success", message: "pet deleted" });
+  } catch (err) {
+    res.status(500).send({ status: "error", error: err.message });
+  }
 };
 
 const createPetWithImage = async (req, res) => {
   try {
     const file = req.file;
-    const { name, type, age } = req.body;   // 👈 unificados
-    if (!name || !type) {
+    const { name, specie, birthDate } = req.body; // 👈 alineado con Swagger/tests
+    if (!name || !specie) {
       return res
         .status(400)
         .send({ status: "error", error: "Incomplete values" });
     }
+
     const pet = PetDTO.getPetInputFrom({
       name,
-      type,
-      age,
+      specie,
+      birthDate,
       image: `${__dirname}/../public/img/${file.filename}`,
     });
+
     const result = await petsService.create(pet);
-    res.status(201).send({ status: "success", payload: result._id }); // 👈 solo id
+
+    res.status(201).send({ status: "success", payload: result._id });
   } catch (err) {
     res.status(500).send({ status: "error", error: err.message });
   }

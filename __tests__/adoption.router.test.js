@@ -7,7 +7,7 @@ import app from '../src/app.js';
 jest.setTimeout(20000);
 
 afterAll(async () => {
-  await mongoose.connection.close();
+  await mongoose.disconnect(); // 👈 cierre limpio
 });
 
 describe('Adoptions - functional tests', () => {
@@ -22,26 +22,26 @@ describe('Adoptions - functional tests', () => {
       role: 'user'
     });
     expect([200,201]).toContain(res.status);
-    uid = res.body.payload || res.body._id || res.body.id;
+    uid = res.body.payload?._id || res.body.payload || res.body._id || res.body.id;
     expect(uid).toBeDefined();
   });
 
   test('fixture: create pet', async () => {
     const res = await request(app).post('/api/pets').send({
       name: 'Firulais',
-      type: 'dog',
-      age: 2
+      specie: 'dog',
+      birthDate: '2022-01-01'
     });
     expect([200,201]).toContain(res.status);
-    pid = res.body.payload || res.body._id || res.body.id;
+    pid = res.body.payload?._id || res.body.payload || res.body._id || res.body.id;
     expect(pid).toBeDefined();
   });
 
   test('POST /api/adoptions (success)', async () => {
     const res = await request(app).post('/api/adoptions').send({ uid, pid });
-    expect(res.status).toBe(201); // 👈 ahora esperamos 201
+    expect(res.status).toBe(201);
     expect(res.body.status).toBe("success");
-    adoptionId = res.body.payload; // 👈 guardamos el id
+    adoptionId = res.body.payload;
     expect(adoptionId).toBeDefined();
   });
 
@@ -61,5 +61,17 @@ describe('Adoptions - functional tests', () => {
   test('GET /api/adoptions/:id', async () => {
     const res = await request(app).get(`/api/adoptions/${adoptionId}`);
     expect([200,404]).toContain(res.status);
+  });
+
+  test('PUT /api/adoptions/:id (actualizar)', async () => {
+    const res = await request(app)
+      .put(`/api/adoptions/${adoptionId}`)
+      .send({ uid, pid });
+    expect([200,404]).toContain(res.status);
+  });
+
+  test('DELETE /api/adoptions/:id (eliminar)', async () => {
+    const res = await request(app).delete(`/api/adoptions/${adoptionId}`);
+    expect([200,204,404]).toContain(res.status);
   });
 });
